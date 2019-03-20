@@ -17,6 +17,15 @@ def timer(func):
     return wrapper
 
 
+def check_other_site_url(doc):
+    soup = BeautifulSoup(doc, features='html.parser')
+    urls = soup.find_all('a')
+    if len(urls) > 0:
+        return True
+    else:
+        return False
+
+
 def read_html(url):
     try:
         try:
@@ -41,16 +50,20 @@ def find_urls(doc, filename, amount):
             if url.get('href') not in VERIFIED_URLS.keys() and amount > 0:
                 print(f"Осталось ссылок: {amount}")
                 amount -= 1
-                if str(url.get('href')).startswith("http"):
+                if str(url.get('href')).startswith("http") and not str(url.get('href')).startswith(SITE):
                     new_lines = read_html(f"{url.get('href')}")
-                    find_urls(new_lines, url.get('href'), amount)
+                    if check_other_site_url(new_lines):
+                        continue
+                    else:
+                        VERIFIED_URLS[url.get('href')] = []
                 else:
-                    new_lines = read_html(f"{SITE}/{url.get('href')}")
+                    new_lines = read_html(f"{SITE}{url.get('href')}")
                     find_urls(new_lines, url.get('href'), amount)
             else:
                 break
     else:
-        VERIFIED_URLS[f"{SITE}{filename}"] = "Не найдено"
+        VERIFIED_URLS[f"{SITE}{filename}"] = []
+
 
 @timer
 def main():
