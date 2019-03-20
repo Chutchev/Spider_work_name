@@ -18,8 +18,8 @@ def update_db(info, table_name):
         for url in info:
             if url is not None:
                 if select_into_db(url, table_name):
-                    cur.execute(f"""UPDATE {table_name} SET url={url}, status='Пустая/неработающая ссылка', 
-                    last_check={datetime.date.today()}""")
+                    cur.execute(f"""UPDATE {table_name} SET status='Пустая/неработающая ссылка', 
+                    last_check=date()""")
                 else:
                     insert_to_db(url, 'Пустая/неработающая ссылка', table_name)
 
