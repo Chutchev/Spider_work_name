@@ -1,6 +1,7 @@
 import sqlite3
 import datetime
 
+
 def select_into_db(url, table_name):
     with sqlite3.connect("URLS.db") as conn:
         cur = conn.cursor()
