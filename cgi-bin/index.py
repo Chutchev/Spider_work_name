@@ -14,7 +14,6 @@ def select_all_into_db(table_name):
 def main():
     form = cgi.FieldStorage()
     url = form.getfirst("URL")
-    amount = form.getfirst("amount")
     table_name = url.split("/")[2].split('.')
     table_name = "_".join(table_name)
     subprocess.call(f"python script.py {url}")
