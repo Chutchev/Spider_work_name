@@ -2,6 +2,7 @@ import cgi
 import subprocess
 import sqlite3
 
+
 def select_all_into_db(table_name):
     with sqlite3.connect("URLS.db") as conn:
         cur = conn.cursor()
