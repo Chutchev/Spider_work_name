@@ -20,16 +20,29 @@ def main():
     strokes = select_all_into_db(table_name)
     print("Content-type: text/html\n")
     print("""<!DOCTYPE HTML>
-                    <html>
-                    <head>
-                        <meta charset="windows-1251">
-                        <title>Результаты</title>
-                    </head>
-                    <body>""")
+                <html>
+                <head>
+                    <meta charset="windows-1251">
+                    <title>Результаты</title>
+                    <style>
+                    #header{
+    	background-color: #597da3;
+    	margin: 0px 0px 10px 0px;
+    	height: 80px;
+    }
+
+    #header h1{
+    	margin: 0px 0px 0px 0px;
+    	color: #fff;
+    	padding: 20px 0px 0px 10px;
+    }
+    </style>
+                </head>
+                <body>""")
     print('<div id="header"><h1>Вывод</h1></div>')
     for url, status, date in strokes:
         print(f'<p>URL: <a href="{url}">{url}</a>    Статус: {status}    Дата: {date}</p>')
-    print('/body')
+    print('</body>\r\n</html>')
 
 
 if __name__ == '__main__':
