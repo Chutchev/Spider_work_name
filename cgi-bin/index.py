@@ -15,7 +15,7 @@ def main():
     form = cgi.FieldStorage()
     url = form.getfirst("URL")
     table_name = url.split("/")[2].split('.')
-    table_name = "_".join(table_name)
+    table_name = "_".join(table_name).replace('-', '__')
     subprocess.call(f"python script.py {url}")
     strokes = select_all_into_db(table_name)
     print("Content-type: text/html\n")
