@@ -30,12 +30,6 @@ def read_html(url):
         return None
 
 
-def return_url(doc):
-    soup = BeautifulSoup(doc, features='html.parser')
-    urls = soup.find_all('a')
-    return urls
-
-
 def find_urls(doc):
     soup = BeautifulSoup(doc, features='html.parser')
     urls = soup.find_all('a')
@@ -45,27 +39,24 @@ def find_urls(doc):
 def a_list(site, url, dicionary):
     if str(url).startswith('http'):
         response = read_html(url)
-        if response.status_code == 200:
+        if response.status_code == 200 and response is not None:
             doc = response.content.decode('utf-8', errors='ignore')
             dicionary[url] = find_urls(doc)
         else:
-            print(response.status_code, url)
             dicionary[url] = []
     elif str(url).startswith('/'):
         response = read_html(f'{site}{url}')
-        if response.status_code == 200:
+        if response.status_code == 200 and response is not None:
             doc = response.content.decode('utf-8', errors='ignore')
             dicionary[f'{site}{url}'] = find_urls(doc)
         else:
-            print(response.status_code, url)
             dicionary[f'{site}{url}'] = []
     else:
         response = read_html(f'{site}/{url}')
-        if response.status_code == 200:
+        if response.status_code == 200 and response is not None:
             doc = response.content.decode('utf-8', errors='ignore')
             dicionary[f'{site}/{url}'] = find_urls(doc)
         else:
-            print(response.status_code, url)
             dicionary[f'{site}/{url}'] = []
     return dicionary
 
@@ -74,7 +65,6 @@ def fill_base_dict(urls, site):
     for url in urls:
         url = url.get('href')
         if url not in VERIFIED_URLS.keys():
-            print(f"{url}")
             dictionary = a_list(site, url, VERIFIED_URLS)
             try:
                 VERIFIED_URLS[url] = dictionary.values()
@@ -115,10 +105,8 @@ def main():
     args = parser.parse_args()
     site_name = args.site
     table_name = site_name.split("/")[2].split('.')
-    print(table_name)
     site = "http://" + '.'.join(table_name)
-    print(site)
-    table_name = "_".join(table_name)
+    table_name = "_".join(table_name).replace("-", '__')
     response = read_html(site_name)
     full_dict = {}
     if response.status_code == '404':
@@ -138,9 +126,11 @@ def main():
         DB.create_db(table_name)
     except OperationalError:
         pass
-    DB.update_db(dont.values(), table_name)
-    strokes = select_all_into_db(table_name)
-    pprint(strokes)
+    try:
+        DB.update_db(dont.values(), table_name)
+    except Exception  as e:
+        print(e)
+
 
 if __name__ == "__main__":
     main()
