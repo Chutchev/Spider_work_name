@@ -7,8 +7,7 @@ import sqlite3
 from pprint import pprint
 import requests.exceptions as re
 from sqlite3 import OperationalError
-VERIFIED_URLS = {}
-URLS = []
+import logging
 
 
 def timer(func):
@@ -36,58 +35,40 @@ def find_urls(doc):
     return urls
 
 
-def a_list(site, url, dicionary):
-    if str(url).startswith('http'):
-        response = read_html(url)
-        if response.status_code == 200 and response is not None:
-            doc = response.content.decode('utf-8', errors='ignore')
-            dicionary[url] = find_urls(doc)
+def check_url(url):
+    try:
+        response = requests.get(url)
+        if 199 < response.status_code < 400 and response is not None:
+            return True
         else:
-            dicionary[url] = []
-    elif str(url).startswith('/'):
-        response = read_html(f'{site}{url}')
-        if response.status_code == 200 and response is not None:
-            doc = response.content.decode('utf-8', errors='ignore')
-            dicionary[f'{site}{url}'] = find_urls(doc)
-        else:
-            dicionary[f'{site}{url}'] = []
-    else:
-        response = read_html(f'{site}/{url}')
-        if response.status_code == 200 and response is not None:
-            doc = response.content.decode('utf-8', errors='ignore')
-            dicionary[f'{site}/{url}'] = find_urls(doc)
-        else:
-            dicionary[f'{site}/{url}'] = []
-    return dicionary
+            print(url, response.status_code)
+            return False
+    except re.ConnectionError as e:
+        print(url, e)
+        return False
 
 
-def fill_base_dict(urls, site):
+def fill_base_list(urls, url_list: list):
     for url in urls:
         url = url.get('href')
-        if url not in VERIFIED_URLS.keys():
-            dictionary = a_list(site, url, VERIFIED_URLS)
-            try:
-                VERIFIED_URLS[url] = dictionary.values()
-            except AttributeError:
-                VERIFIED_URLS[url] = []
+        if url not in url_list:
+            url_list.append(url)
+    return url_list
 
 
-def fill_extra_dict(site):
-    extra_dict = {}
-    for value in VERIFIED_URLS.values():
-        for url in value:
-            try:
-                url = url.get('href')
-                if url not in VERIFIED_URLS.keys():
-                    print(f'fill_extra_dict: {url}')
-                    dictionary = a_list(site, url, extra_dict)
-                    try:
-                        extra_dict[url] = dictionary.values()
-                    except AttributeError:
-                        pass
-            except AttributeError:
-                pass
-    return extra_dict
+def fill_breaking_url_list(urls, site):
+    breaking = []
+    for url in urls:
+        if str(url).startswith('http'):
+            if not check_url(url):
+                breaking.append(url)
+        elif str(url).startswith('/'):
+            if not check_url(f'{site}{url}'):
+                breaking.append(f'{site}{url}')
+        else:
+            if not check_url(f'{site}/{url}'):
+                breaking.append(f'{site}/{url}')
+    return breaking
 
 
 def select_all_into_db(table_name):
@@ -98,8 +79,28 @@ def select_all_into_db(table_name):
     return strokes
 
 
+def func(base_list, site):
+    print('func')
+    for url in base_list:
+        print(url)
+        if str(url).startswith(site):
+            doc = read_html(url)
+            logging.error("{url} startswith")
+            if doc is not None:
+                doc = doc.content.decode('utf-8', errors='ignore')
+                urls = find_urls(doc)
+                a_list = fill_base_list(urls, base_list)
+                for extra_url in a_list:
+                    if extra_url not in base_list:
+                        print(extra_url)
+                        base_list.append(extra_url)
+        else:
+            logging.error(f"ERROR: {url} in base_list")
+    return base_list
+
 @timer
 def main():
+    logging.basicConfig(filename="log.log")
     parser = argparse.ArgumentParser(description="Spider-script")
     parser.add_argument('site', help='Сайт который надо обойти')
     args = parser.parse_args()
@@ -108,26 +109,26 @@ def main():
     site = "http://" + '.'.join(table_name)
     table_name = "_".join(table_name).replace("-", '__')
     response = read_html(site_name)
-    full_dict = {}
-    if response.status_code == '404':
-        VERIFIED_URLS[site_name] = []
-    else:
-        doc = response.content.decode('utf-8', errors='ignore')
-        urls = find_urls(doc)
-        fill_base_dict(urls, site)
-        extra_dict = fill_extra_dict(site)
-        full_dict = {**VERIFIED_URLS, **extra_dict}
-    dont = {}
-    for k, v in full_dict.items():
-        if len(v) == 0:
-            dont[k] = [].append(v)
-    pprint(dont)
+    doc = response.content.decode('utf-8', errors='ignore')
+    urls = find_urls(doc)
+    new_list = fill_base_list(urls, [])
+    base_list = [site_name, *new_list]
+    old = []
+    while old != base_list:
+        old = base_list
+        print("old: ", old)
+        print("base_list: ", base_list)
+        base_list = func(base_list, site)
+        if base_list == old:
+            break
+    breaking = fill_breaking_url_list(base_list, site)
+    pprint(breaking)
     try:
         DB.create_db(table_name)
     except OperationalError:
         pass
     try:
-        DB.update_db(dont.values(), table_name)
+        DB.update_db(breaking, table_name)
     except Exception  as e:
         print(e)
 
