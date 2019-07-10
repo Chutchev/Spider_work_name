@@ -37,27 +37,21 @@ def spider(ss):
         break
 
 
-def create_py(title: str):
-    pattern = f"""class {title.capitalize()}:
-    
-    def __init__(self):
-        pass"""
-
+def create_py(pattern, title: str):
     with open(os.path.abspath(f"./Classes/{title.capitalize()}.py"), "w") as f:
         f.write(pattern)
-
     logging.info(f"Класс {title.capitalize()} создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 
 
 def get_title(url):
-    response = read_html(url)
+    if not url.startswith(site_name) and not url.startswith("http"):
+        response = read_html(f"{site_name}{url}")
+    else:
+        response = read_html(url)
     if response is not None:
         title = find_info(response.content.decode('utf-8', errors='ignore'), 'title')
         title = str(*title).replace("</title>", "").replace("<title>", "")
-        try:
-            create_py(title)
-        except FileExistsError:
-            logging.info(f"Класс {title.capitalize()} уже создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
+        return title
 
 
 def timer(func):
@@ -100,16 +94,32 @@ def check_url(url):
 
 @timer
 def main():
-    os.makedirs(os.path.abspath("./Classes"))
+    logging.info(f"НОВЫЙ ЗАПУСК. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
+    try:
+        os.makedirs(os.path.abspath("./Classes"))
+    except FileExistsError:
+        logging.info(f"Папка Classes уже создана. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     parser = argparse.ArgumentParser(description="Spider-script")
     parser.add_argument('site', help='Сайт который надо обойти')
     args = parser.parse_args()
     global site_name
+    global checked
     site_name = args.site
     spider(site_name)
+    checked = set(checked)
+    with open(os.path.abspath("./Шаблон.txt"), 'r') as f:
+        pattern = f.read()
     for url in checked:
-        get_title(url)
-
+        print(url)
+        title = get_title(url)
+        try:
+            create_py(pattern.format(title), title)
+        except FileExistsError:
+            logging.info(
+                f"Класс {title.capitalize()} уже создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
+        except AttributeError:
+            logging.info(
+                f"Ошибка про создании класса. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 
 if __name__ == "__main__":
     main()
