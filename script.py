@@ -28,24 +28,22 @@ def spider(ss):
     global checked
     global site_name
     response = read_html(ss)
-    print(ss, response)
+    print(ss, ss in checked)
     doc = response.content.decode('utf-8', errors='ignore')
-    urls = [create_right_url(x.get('href')) for x in find_info(doc, 'a') if create_right_url(x.get('href')) is not None and create_right_url(x.get('href')) not in checked]
+    urls = [create_right_url(x.get('href')) for x in find_info(doc, 'a') if create_right_url(x.get('href')) is not None
+            and create_right_url(x.get('href')) not in checked]
     logging.info(f"Ссылка: {ss}. На сайте: {urls}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     while True:
         for url in urls:
             if url is not None:
                 if url.startswith(site_name):
                     if url not in checked:
-                        res = check_url(url)
-                        if res:
-                            checked.append(url)
-                            create_class(url, pattern)
-                            spider(url)
+                        checked.append(url)
+                        create_class(url, pattern)
+                        spider(url)
                     else:
                         break
                 else:
-                    check_url(url)
                     checked.append(url)
         break
 
@@ -103,19 +101,6 @@ def create_class(url, pattern):
         logging.info(
             f"Ошибка про создании класса. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 
-
-def check_url(url):
-    try:
-        response = requests.get(url)
-        if 199 < response.status_code < 400 and response is not None:
-            print(url, response.status_code)
-            return True
-        else:
-            print(url, response.status_code)
-            return False
-    except (re.ConnectionError, re.MissingSchema) as e:
-        print(url, e)
-        return False
 
 @timer
 def main():
