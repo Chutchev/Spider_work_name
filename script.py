@@ -11,24 +11,37 @@ import os
 checked = []
 site_name = ""
 logging.basicConfig(filename="logs.log", level=logging.INFO)
+pattern = ""
+
+
+def create_right_url(url):
+    if url is not None:
+        if not url.startswith(site_name) and not url.startswith("http"):
+            return f"{site_name}{url}"
+        else:
+            return url
+    else:
+        return None
 
 
 def spider(ss):
     global checked
     global site_name
     response = read_html(ss)
+    print(ss, response)
     doc = response.content.decode('utf-8', errors='ignore')
-    urls = [x.get('href') for x in find_info(doc, 'a') if x.get('href') not in checked]
+    urls = [create_right_url(x.get('href')) for x in find_info(doc, 'a') if create_right_url(x.get('href')) is not None and create_right_url(x.get('href')) not in checked]
     logging.info(f"Ссылка: {ss}. На сайте: {urls}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     while True:
         for url in urls:
             if url is not None:
-                if not url.startswith(site_name) and not url.startswith("http"):
+                if url.startswith(site_name):
                     if url not in checked:
-                        res = check_url(f"{site_name}{url}")
+                        res = check_url(url)
                         if res:
                             checked.append(url)
-                            spider(f"{site_name}{url}")
+                            create_class(url, pattern)
+                            spider(url)
                     else:
                         break
                 else:
@@ -79,6 +92,18 @@ def find_info(doc, tag):
     return info
 
 
+def create_class(url, pattern):
+    title = get_title(url)
+    try:
+        create_py(pattern.format(title), title)
+    except FileExistsError:
+        logging.info(
+            f"Класс {title.capitalize()} уже создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
+    except AttributeError:
+        logging.info(
+            f"Ошибка про создании класса. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
+
+
 def check_url(url):
     try:
         response = requests.get(url)
@@ -104,22 +129,13 @@ def main():
     args = parser.parse_args()
     global site_name
     global checked
+    global pattern
+    with open(os.path.abspath("./Шаблон.txt"), 'r') as f:
+        pattern = f.read()
     site_name = args.site
     spider(site_name)
     checked = set(checked)
-    with open(os.path.abspath("./Шаблон.txt"), 'r') as f:
-        pattern = f.read()
-    for url in checked:
-        print(url)
-        title = get_title(url)
-        try:
-            create_py(pattern.format(title), title)
-        except FileExistsError:
-            logging.info(
-                f"Класс {title.capitalize()} уже создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
-        except AttributeError:
-            logging.info(
-                f"Ошибка про создании класса. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
+
 
 if __name__ == "__main__":
     main()
