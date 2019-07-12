@@ -6,8 +6,10 @@ import argparse
 import requests.exceptions as re
 import logging
 import os
-
-
+from selenium import webdriver
+from pprint import pprint
+from selenium.common.exceptions import StaleElementReferenceException
+driver = None
 checked = []
 site_name = ""
 logging.basicConfig(filename="logs.log", level=logging.INFO)
@@ -22,69 +24,38 @@ def timer(func):
     return wrapper
 
 
-def create_right_url(url):
-    if url is not None:
-        if not url.startswith(site_name) and not url.startswith("http"):
-            return f"{site_name}{url}"
-        else:
-            return url
-    else:
-        return None
-
-
 def spider(ss):
-    global checked
-    global site_name
-    checked = list(set(checked))
-    response = read_html(ss)
-    print(ss, ss in checked)
-    doc = response.content.decode('utf-8', errors='ignore')
-    create_class(doc, pattern)
-    urls = [create_right_url(x.get('href')) for x in find_info(doc, 'a') if create_right_url(x.get('href')) is not None
-            and create_right_url(x.get('href')) not in checked]
-    logging.info(f"Ссылка: {ss}. На сайте: {urls}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
-    for url in urls:
-            if url.startswith(site_name):
-                if url not in checked:
-                    checked.append(url)
-                    spider(url)
-                else:
-                    break
+    print(ss)
+    driver.get(ss)
+    elements = driver.find_elements_by_xpath("//a")
+    for element in elements:
+        try:
+            url = element.get_attribute('href')
+        except StaleElementReferenceException as e:
+            continue
+        if url not in checked:
+            checked.append(url)
+            try:
+                create_class()
+                spider(url)
+            except StaleElementReferenceException:
+                print(url)
+    return checked
 
 
-def create_py(pattern, title: str):
+def create_py(title: str):
+    global pattern
     with open(os.path.abspath(f"./Classes/{title.capitalize()}.py"), "w") as f:
         f.write(pattern)
     logging.info(f"Класс {title.capitalize()} создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 
 
-def get_title(doc):
-    title = find_info(doc, 'title')
-    title = str(*title).replace("</title>", "").replace("<title>", "")
-    return title
-
-
-def read_html(url):
+def create_class():
+    global pattern
+    title = driver.title
+    pattern = pattern.format(title)
     try:
-        try:
-            response = requests.get(url=url)
-            return response
-        except (ConnectionError, re.ConnectionError):
-            pass
-    except (re.MissingSchema, re.InvalidSchema):
-        return None
-
-
-def find_info(doc, tag):
-    soup = BeautifulSoup(doc, features='html.parser')
-    info = soup.find_all(tag)
-    return info
-
-
-def create_class(doc, pattern):
-    title = get_title(doc)
-    try:
-        create_py(pattern.format(title), title)
+        create_py(title)
     except FileExistsError:
         logging.info(
             f"Класс {title.capitalize()} уже создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
@@ -95,6 +66,8 @@ def create_class(doc, pattern):
 
 @timer
 def main():
+    global driver
+    driver = webdriver.Chrome(os.path.abspath("./chromedriver"))
     logging.info(f"НОВЫЙ ЗАПУСК. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
     try:
         os.makedirs(os.path.abspath("./Classes"))
@@ -109,7 +82,8 @@ def main():
     with open(os.path.abspath("./Шаблон.txt"), 'r') as f:
         pattern = f.read()
     site_name = args.site
-    spider(site_name)
+    checked = spider(site_name)
+    driver.quit()
 
 
 if __name__ == "__main__":
