@@ -35,6 +35,7 @@ def create_right_url(url):
 def spider(ss):
     global checked
     global site_name
+    checked = list(set(checked))
     response = read_html(ss)
     print(ss, ss in checked)
     doc = response.content.decode('utf-8', errors='ignore')
@@ -42,15 +43,13 @@ def spider(ss):
     urls = [create_right_url(x.get('href')) for x in find_info(doc, 'a') if create_right_url(x.get('href')) is not None
             and create_right_url(x.get('href')) not in checked]
     logging.info(f"Ссылка: {ss}. На сайте: {urls}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
-    while True:
-        for url in urls:
-                if url.startswith(site_name):
-                    if url not in checked:
-                        checked.append(url)
-                        spider(url)
-                    else:
-                        break
-        break
+    for url in urls:
+            if url.startswith(site_name):
+                if url not in checked:
+                    checked.append(url)
+                    spider(url)
+                else:
+                    break
 
 
 def create_py(pattern, title: str):
@@ -60,14 +59,9 @@ def create_py(pattern, title: str):
 
 
 def get_title(doc):
-    # if not url.startswith(site_name) and not url.startswith("http"):
-    #     response = read_html(f"{site_name}{url}")
-    # else:
-    #     response = read_html(url)
-    #if response is not None:
-        title = find_info(doc, 'title')
-        title = str(*title).replace("</title>", "").replace("<title>", "")
-        return title
+    title = find_info(doc, 'title')
+    title = str(*title).replace("</title>", "").replace("<title>", "")
+    return title
 
 
 def read_html(url):
@@ -116,7 +110,6 @@ def main():
         pattern = f.read()
     site_name = args.site
     spider(site_name)
-    checked = set(checked)
 
 
 if __name__ == "__main__":
