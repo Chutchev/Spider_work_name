@@ -14,6 +14,14 @@ logging.basicConfig(filename="logs.log", level=logging.INFO)
 pattern = ""
 
 
+def timer(func):
+    def wrapper(*args):
+        start = time.time()
+        func(*args)
+        print(f"Время выполнения {func.__name__}: {time.time()-start}")
+    return wrapper
+
+
 def create_right_url(url):
     if url is not None:
         if not url.startswith(site_name) and not url.startswith("http"):
@@ -30,21 +38,18 @@ def spider(ss):
     response = read_html(ss)
     print(ss, ss in checked)
     doc = response.content.decode('utf-8', errors='ignore')
+    create_class(doc, pattern)
     urls = [create_right_url(x.get('href')) for x in find_info(doc, 'a') if create_right_url(x.get('href')) is not None
             and create_right_url(x.get('href')) not in checked]
     logging.info(f"Ссылка: {ss}. На сайте: {urls}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     while True:
         for url in urls:
-            if url is not None:
                 if url.startswith(site_name):
                     if url not in checked:
                         checked.append(url)
-                        create_class(url, pattern)
                         spider(url)
                     else:
                         break
-                else:
-                    checked.append(url)
         break
 
 
@@ -54,23 +59,15 @@ def create_py(pattern, title: str):
     logging.info(f"Класс {title.capitalize()} создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 
 
-def get_title(url):
-    if not url.startswith(site_name) and not url.startswith("http"):
-        response = read_html(f"{site_name}{url}")
-    else:
-        response = read_html(url)
-    if response is not None:
-        title = find_info(response.content.decode('utf-8', errors='ignore'), 'title')
+def get_title(doc):
+    # if not url.startswith(site_name) and not url.startswith("http"):
+    #     response = read_html(f"{site_name}{url}")
+    # else:
+    #     response = read_html(url)
+    #if response is not None:
+        title = find_info(doc, 'title')
         title = str(*title).replace("</title>", "").replace("<title>", "")
         return title
-
-
-def timer(func):
-    def wrapper():
-        start = time.time()
-        func()
-        print(f"Время выполнения {func.__name__}: {time.time()-start}")
-    return wrapper
 
 
 def read_html(url):
@@ -90,8 +87,8 @@ def find_info(doc, tag):
     return info
 
 
-def create_class(url, pattern):
-    title = get_title(url)
+def create_class(doc, pattern):
+    title = get_title(doc)
     try:
         create_py(pattern.format(title), title)
     except FileExistsError:
