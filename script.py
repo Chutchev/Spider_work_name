@@ -1,3 +1,5 @@
+import threading
+from queue import Queue
 import time
 from datetime import datetime
 import argparse
@@ -8,8 +10,18 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 
 
+
+def thread(func):
+    def wrapper(*args):
+        if threading.active_count() < 5:
+            threading.Thread(target=func, args=args).start()
+        else:
+            func(args)
+    return wrapper
+
+que = Queue()
 driver = None
-checked = []
+checked = Queue()
 site_name = ""
 logging.basicConfig(filename="logs.log", level=logging.INFO)
 pattern = ""
@@ -39,26 +51,31 @@ def check_class(title:str):
     else:
         return False
 
-
+@thread
 def spider(ss):
+    print("ss", ss, type(ss), threading.current_thread().name)
     global checked
     global site_name
-    driver.get(ss)
+    if isinstance(ss, tuple):
+        driver.get(ss[0])
+    else:
+        driver.get(ss)
+    checked.put(ss)
     elements = driver.find_elements_by_xpath("//a")
     for element in elements:
         try:
             url = element.get_attribute('href')
-
+            if url is not None and url not in checked.queue and url.startswith(site_name):
+                print(url, threading.current_thread().name)
+                que.put(url)
+                url = que.get()
+                print("que.get", url)
+            else:
+                print(url, checked.queue, threading.current_thread().name)
         except StaleElementReferenceException as e:
             continue
-        if url not in checked and url is not None and url.startswith(site_name):
-            print(url)
-            checked.append(url)
-            title = driver.title
-            if check_class(title):
-                create_class(title)
-            spider(url)
-    return checked
+    if que.empty():
+        que.task_done()
 
 
 def create_py(title: str):
@@ -103,10 +120,13 @@ def main():
         pattern = f.read()
     try:
         site_name = args.site
-        checked = spider(site_name)
+        que.put(site_name)
+        spider(que.get())
+        que.join()
     except Exception as e:
         print(e)
     finally:
+        print(que.queue)
         driver.quit()
 
 
