@@ -1,14 +1,13 @@
-from bs4 import BeautifulSoup
-import requests
 import time
 from datetime import datetime
 import argparse
-import requests.exceptions as re
 import logging
 import os
 from selenium import webdriver
-from pprint import pprint
+from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
+
+
 driver = None
 checked = []
 site_name = ""
@@ -24,22 +23,32 @@ def timer(func):
     return wrapper
 
 
+def create_right_url(url):
+    if url is not None:
+        if not url.startswith(site_name) and not url.startswith("http"):
+            return f"{site_name}{url}"
+        else:
+            return url
+    else:
+        return None
+
+
 def spider(ss):
-    print(ss)
+    global checked
+    global site_name
     driver.get(ss)
     elements = driver.find_elements_by_xpath("//a")
     for element in elements:
         try:
             url = element.get_attribute('href')
+
         except StaleElementReferenceException as e:
             continue
-        if url not in checked:
+        if url not in checked and url is not None and url.startswith(site_name):
+            print(url)
             checked.append(url)
-            try:
-                create_class()
-                spider(url)
-            except StaleElementReferenceException:
-                print(url)
+            create_class()
+            spider(url)
     return checked
 
 
@@ -67,7 +76,9 @@ def create_class():
 @timer
 def main():
     global driver
-    driver = webdriver.Chrome(os.path.abspath("./chromedriver"))
+    options = Options()
+    options.add_argument('--headless')
+    driver = webdriver.Chrome(os.path.abspath("./chromedriver"), chrome_options=options)
     logging.info(f"НОВЫЙ ЗАПУСК. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
     try:
         os.makedirs(os.path.abspath("./Classes"))
