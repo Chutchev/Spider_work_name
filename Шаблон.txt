@@ -1,6 +1,6 @@
 class {}:
 
-    xpath_dict = {}
+    xpath_dict = dict()
 
     def __init__(self):
         pass
