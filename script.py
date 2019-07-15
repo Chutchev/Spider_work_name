@@ -25,7 +25,7 @@ checked = Queue()
 site_name = ""
 logging.basicConfig(filename="logs.log", level=logging.INFO)
 pattern = ""
-
+titles = Queue()
 
 def timer(func):
     def wrapper(*args):
@@ -62,20 +62,25 @@ def spider(ss):
         driver.get(ss)
     checked.put(ss)
     elements = driver.find_elements_by_xpath("//a")
+    print(que.queue)
     for element in elements:
         try:
             url = element.get_attribute('href')
-            if url is not None and url not in checked.queue and url.startswith(site_name):
-                print(url, threading.current_thread().name)
+            print(url)
+            if url is not None and url not in que.queue and url.startswith(site_name) and url not in checked.queue:
+                print(url, url not in que.queue, url not in checked.queue)
                 que.put(url)
-                url = que.get()
-                print("que.get", url)
             else:
                 print(url, checked.queue, threading.current_thread().name)
         except StaleElementReferenceException as e:
+            print("cont")
             continue
     if que.empty():
         que.task_done()
+    else:
+        print("else")
+        for url in list(que.queue):
+            spider(que.get(url))
 
 
 def create_py(title: str):
