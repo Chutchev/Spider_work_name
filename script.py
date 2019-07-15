@@ -33,6 +33,13 @@ def create_right_url(url):
         return None
 
 
+def check_class(title:str):
+    if os.path.exists(f"{title.capitalize()}.py"):
+        return True
+    else:
+        return False
+
+
 def spider(ss):
     global checked
     global site_name
@@ -47,7 +54,9 @@ def spider(ss):
         if url not in checked and url is not None and url.startswith(site_name):
             print(url)
             checked.append(url)
-            create_class()
+            title = driver.title
+            if check_class(title):
+                create_class(title)
             spider(url)
     return checked
 
@@ -56,12 +65,12 @@ def create_py(title: str):
     global pattern
     with open(os.path.abspath(f"./Classes/{title.capitalize()}.py"), "w") as f:
         f.write(pattern)
+    print(f"Класс {title.capitalize()} создан")
     logging.info(f"Класс {title.capitalize()} создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 
 
-def create_class():
+def create_class(title:str):
     global pattern
-    title = driver.title
     pattern = pattern.format(title)
     try:
         create_py(title)
@@ -92,9 +101,13 @@ def main():
     global pattern
     with open(os.path.abspath("./Шаблон.txt"), 'r') as f:
         pattern = f.read()
-    site_name = args.site
-    checked = spider(site_name)
-    driver.quit()
+    try:
+        site_name = args.site
+        checked = spider(site_name)
+    except Exception as e:
+        print(e)
+    finally:
+        driver.quit()
 
 
 if __name__ == "__main__":
