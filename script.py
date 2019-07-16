@@ -52,6 +52,7 @@ def spider(ss):
     global checked
     global site_name
     print(ss, threading.current_thread().name, threading.active_count())
+    logging.info(f"Проверяем {ss}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     if que.empty():
         que.task_done()
     que.get()
@@ -101,7 +102,7 @@ def main():
     options = Options()
     options.add_argument('--headless')
     driver = webdriver.Chrome(os.path.abspath("./chromedriver"), chrome_options=options)
-    logging.info(f"НОВЫЙ ЗАПУСК. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
+    logging.info(f"\nНОВЫЙ ЗАПУСК. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
     try:
         os.makedirs(os.path.abspath("./Classes"))
     except FileExistsError:
