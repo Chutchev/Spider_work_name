@@ -10,12 +10,12 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 
 
-
 def thread(func):
     def wrapper(*args):
         if threading.active_count() < 4:
             threading.Thread(target=func, args=args).start()
     return wrapper
+
 
 que = Queue()
 driver = None
@@ -24,6 +24,7 @@ site_name = ""
 logging.basicConfig(filename="logs.log", level=logging.INFO)
 pattern = ""
 titles = Queue()
+
 
 def timer(func):
     def wrapper(*args):
@@ -43,7 +44,6 @@ def check_class(title:str):
 def run():
     global que
     spider(que.queue[0])
-
 
 
 @thread
@@ -127,5 +127,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()
