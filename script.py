@@ -1,6 +1,5 @@
 import threading
 from queue import Queue
-import pprint
 import time
 from datetime import datetime
 import argparse
@@ -14,10 +13,8 @@ from selenium.common.exceptions import StaleElementReferenceException
 
 def thread(func):
     def wrapper(*args):
-        if threading.active_count() < 5:
+        if threading.active_count() < 4:
             threading.Thread(target=func, args=args).start()
-        else:
-            func(*args)
     return wrapper
 
 que = Queue()
@@ -36,34 +33,32 @@ def timer(func):
     return wrapper
 
 
-def create_right_url(url):
-    if url is not None:
-        if not url.startswith(site_name) and not url.startswith("http"):
-            return f"{site_name}{url}"
-        else:
-            return url
-    else:
-        return None
-
-
 def check_class(title:str):
     if os.path.exists(f"{title.capitalize()}.py"):
         return True
     else:
         return False
 
+
+def run():
+    global que
+    spider(que.queue[0])
+
+
+
 @thread
 def spider(ss):
-    print("ss", ss, type(ss), threading.current_thread().name)
+    global que
     global checked
     global site_name
-    if isinstance(ss, tuple):
-        driver.get(ss[0])
-    else:
-        driver.get(ss)
+    print(ss, threading.current_thread().name, threading.active_count())
+    if que.empty():
+        que.task_done()
+    que.get()
+    driver.get(ss)
     checked.put(ss)
+    create_class(driver.title)
     elements = driver.find_elements_by_xpath("//a")
-
     for element in elements:
         try:
             url = element.get_attribute('href')
@@ -71,16 +66,12 @@ def spider(ss):
                 que.put(url)
         except StaleElementReferenceException as e:
             continue
-    if que.empty():
-        print(len(que.queue))
-        que.task_done()
-    else:
-        print(len(que.queue), que.queue)
-        pprint.pprint(len(checked.queue))
-        for url in list(que.queue):
-            ss = que.get(url)
-            que.task_done()
-            spider(ss)
+    print(que.queue)
+    que.task_done()
+    try:
+        spider(que.queue[0])
+    except IndexError:
+        print("УРААА")
 
 
 def create_py(title: str):
@@ -126,12 +117,12 @@ def main():
     try:
         site_name = args.site
         que.put(site_name)
-        spider(que.get())
+        run()
         que.join()
     except Exception as e:
         print(e)
     finally:
-        print(que.queue)
+        print(checked.queue)
         driver.quit()
 
 
