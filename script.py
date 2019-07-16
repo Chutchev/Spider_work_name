@@ -1,5 +1,6 @@
 import threading
 from queue import Queue
+import pprint
 import time
 from datetime import datetime
 import argparse
@@ -16,7 +17,7 @@ def thread(func):
         if threading.active_count() < 5:
             threading.Thread(target=func, args=args).start()
         else:
-            func(args)
+            func(*args)
     return wrapper
 
 que = Queue()
@@ -62,25 +63,24 @@ def spider(ss):
         driver.get(ss)
     checked.put(ss)
     elements = driver.find_elements_by_xpath("//a")
-    print(que.queue)
+
     for element in elements:
         try:
             url = element.get_attribute('href')
-            print(url)
             if url is not None and url not in que.queue and url.startswith(site_name) and url not in checked.queue:
-                print(url, url not in que.queue, url not in checked.queue)
                 que.put(url)
-            else:
-                print(url, checked.queue, threading.current_thread().name)
         except StaleElementReferenceException as e:
-            print("cont")
             continue
     if que.empty():
+        print(len(que.queue))
         que.task_done()
     else:
-        print("else")
+        print(len(que.queue), que.queue)
+        pprint.pprint(len(checked.queue))
         for url in list(que.queue):
-            spider(que.get(url))
+            ss = que.get(url)
+            que.task_done()
+            spider(ss)
 
 
 def create_py(title: str):
@@ -136,4 +136,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
