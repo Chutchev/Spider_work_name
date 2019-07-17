@@ -10,20 +10,14 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 
 
+SITE_NAME = ""
+
+
 def thread(func):
     def wrapper(*args):
         if threading.active_count() < 4:
             threading.Thread(target=func, args=args).start()
     return wrapper
-
-
-que = Queue()
-driver = None
-checked = Queue()
-site_name = ""
-logging.basicConfig(filename="logs.log", level=logging.INFO)
-pattern = ""
-titles = Queue()
 
 
 def timer(func):
@@ -41,42 +35,45 @@ def check_class(title:str):
         return False
 
 
-def run():
-    global que
-    spider(que.queue[0])
+def run(que, checked):
+    options = Options()
+    logging.basicConfig(filename="logs.log", level=logging.INFO)
+    options.add_argument('--headless')
+    driver = webdriver.Chrome(os.path.abspath("./chromedriver"), chrome_options=options)
+    spider(que.queue[0], driver, que, checked)
 
 
 @thread
-def spider(ss):
-    global que
-    global checked
-    global site_name
-    print(ss, threading.current_thread().name, threading.active_count())
-    logging.info(f"Проверяем {ss}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
+def spider(link, driver, que, checked):
+    global SITE_NAME
+    logging.getLogger()
+    print(link, threading.current_thread().name, threading.active_count())
+    logging.info(f"Проверяем {link}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     if que.empty():
         que.task_done()
     que.get()
-    driver.get(ss)
-    checked.put(ss)
+    driver.get(link)
+    checked.put(link)
     create_class(driver.title)
     elements = driver.find_elements_by_xpath("//a")
     for element in elements:
         try:
             url = element.get_attribute('href')
-            if url is not None and url not in que.queue and url.startswith(site_name) and url not in checked.queue:
+            if url is not None and url not in que.queue and url.startswith(SITE_NAME) and url not in checked.queue:
                 que.put(url)
         except StaleElementReferenceException as e:
+
             continue
     print(que.queue)
     que.task_done()
     try:
-        spider(que.queue[0])
+        spider(que.queue[0], driver, que, checked)
     except IndexError:
         print("УРААА")
 
 
-def create_py(title: str):
-    global pattern
+def create_py(pattern, title: str):
+    logging.getLogger()
     with open(os.path.abspath(f"./Classes/{title.capitalize()}.py"), "w") as f:
         f.write(pattern)
     print(f"Класс {title.capitalize()} создан")
@@ -84,10 +81,18 @@ def create_py(title: str):
 
 
 def create_class(title:str):
-    global pattern
+    pattern = """
+    class {}:
+
+        xpath_dict = dict()
+
+        def __init__(self):
+            pass"""
+    logging.getLogger()
     pattern = pattern.format(title)
     try:
-        create_py(title)
+        if not check_class(title):
+            create_py(pattern, title)
     except FileExistsError:
         logging.info(
             f"Класс {title.capitalize()} уже создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
@@ -98,10 +103,8 @@ def create_class(title:str):
 
 @timer
 def main():
-    global driver
-    options = Options()
-    options.add_argument('--headless')
-    driver = webdriver.Chrome(os.path.abspath("./chromedriver"), chrome_options=options)
+    que = Queue()
+    checked = Queue()
     logging.info(f"\nНОВЫЙ ЗАПУСК. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
     try:
         os.makedirs(os.path.abspath("./Classes"))
@@ -110,21 +113,16 @@ def main():
     parser = argparse.ArgumentParser(description="Spider-script")
     parser.add_argument('site', help='Сайт который надо обойти')
     args = parser.parse_args()
-    global site_name
-    global checked
-    global pattern
-    with open(os.path.abspath("./Шаблон.txt"), 'r') as f:
-        pattern = f.read()
+    global SITE_NAME
     try:
-        site_name = args.site
-        que.put(site_name)
-        run()
+        SITE_NAME = args.site
+        que.put(SITE_NAME)
+        run(que, checked)
         que.join()
     except Exception as e:
         print(e)
     finally:
         print(checked.queue)
-        driver.quit()
 
 
 if __name__ == "__main__":
