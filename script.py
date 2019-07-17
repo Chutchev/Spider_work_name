@@ -40,7 +40,8 @@ def run(que, checked):
     logging.basicConfig(filename="logs.log", level=logging.INFO)
     options.add_argument('--headless')
     driver = webdriver.Chrome(os.path.abspath("./chromedriver"), chrome_options=options)
-    spider(que.queue[0], driver, que, checked)
+    spider(que.get(), driver, que, checked)
+    que.join()
 
 
 @thread
@@ -51,9 +52,9 @@ def spider(link, driver, que, checked):
     logging.info(f"Проверяем {link}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     if que.empty():
         que.task_done()
-    que.get()
     driver.get(link)
     checked.put(link)
+    print("CHECKED", checked.queue)
     create_class(driver.title)
     elements = driver.find_elements_by_xpath("//a")
     for element in elements:
@@ -67,7 +68,8 @@ def spider(link, driver, que, checked):
     print(que.queue)
     que.task_done()
     try:
-        spider(que.queue[0], driver, que, checked)
+        while not que.empty():
+            spider(que.get(), driver, que, checked)
     except IndexError:
         print("УРААА")
 
@@ -121,8 +123,6 @@ def main():
         que.join()
     except Exception as e:
         print(e)
-    finally:
-        print(checked.queue)
 
 
 if __name__ == "__main__":
