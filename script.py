@@ -1,6 +1,4 @@
-import threading
-from queue import Queue
-from queue import Empty
+from multiprocessing import Queue, Process, Pool, Manager
 import time
 from datetime import datetime
 import argparse
@@ -12,13 +10,6 @@ from selenium.common.exceptions import StaleElementReferenceException
 
 
 SITE_NAME = ""
-
-
-def thread(func):
-    def wrapper(*args):
-        if threading.active_count() < 4:
-            threading.Thread(target=func, args=args).start()
-    return wrapper
 
 
 def timer(func):
@@ -39,7 +30,7 @@ def check_class(title:str):
 def run(que, checked):
     while True:
         url = check_url(que)
-        logging.info(f"\t\tQUE: {list(que.queue)}, THREAD={threading.current_thread().name}")
+        logging.info(f"\t\tQUE: {list(que.queue)}")
         if not url:
             logging.info(f"\t\tBREAKBREAKBREAKBREAKBREAK")
             break
@@ -52,9 +43,9 @@ def run(que, checked):
 def check_url(que):
     try:
         res = que.get(timeout=20)
-    except Empty:
+    except Exception:
         res = False
-    print(res, threading.current_thread().name)
+    print(res)
     return res
 
 
@@ -68,9 +59,8 @@ def spider(link, que, checked):
     for element in elements:
         check_element(element, que, checked)
     logging.getLogger()
-    print(link, threading.current_thread().name, threading.active_count(), len(checked))
     logging.info(f"Проверяем {link}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
-    logging.info(f"\t\tCHECKED: {list(checked)}, \tTHREAD: {threading.current_thread().name}")
+    logging.info(f"\t\tCHECKED: {list(checked)}")
     que.task_done()
     driver.quit()
 
@@ -79,7 +69,6 @@ def check_element(element, que, checked):
     logging.getLogger()
     try:
         url = element.get_attribute('href')
-        print(url, f"Thread name: {threading.current_thread().name}, active Threads: {threading.active_count()}")
         if url is not None and url not in que.queue and url.startswith(SITE_NAME) and url not in checked:
             que.put(url)
             logging.info(f"Такой url: {url} уже в списках. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
@@ -117,13 +106,6 @@ def create_class(title:str):
             f"Ошибка про создании класса. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 
 
-def create_threads(que, checked):
-    for _ in range(4):
-        t = threading.Thread(target=run, args=(que, checked))
-        t.daemon = True
-        t.start()
-
-
 @timer
 def main():
     que = Queue()
@@ -141,7 +123,6 @@ def main():
     try:
         SITE_NAME = args.site
         que.put(SITE_NAME)
-        create_threads(que, checked)
         que.join()
     except Exception as e:
         print(e)
