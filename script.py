@@ -35,27 +35,27 @@ def check_class(title:str):
     else:
         return False
 
-# TODO ИСПРАВИТЬ, НЕ РАБОТАЕТ КАК НУЖНО МНЕ QUE.GET()
+
 def run(que, checked):
     while True:
         url = check_url(que)
-        logging.info(f"\t\tQUE: {list(que.queue)}")
+        logging.info(f"\t\tQUE: {list(que.queue)}, THREAD={threading.current_thread().name}")
         if not url:
             logging.info(f"\t\tBREAKBREAKBREAKBREAKBREAK")
             break
         else:
-            checked.put(url)
+            checked.add(url)
             spider(url, que, checked)
     que.task_done()
 
 
 def check_url(que):
-    print(que.queue)
     try:
-        url = que.get(False)
-        return url
+        res = que.get(timeout=20)
     except Empty:
-        return False
+        res = False
+    print(res, threading.current_thread().name)
+    return res
 
 
 def spider(link, que, checked):
@@ -68,9 +68,10 @@ def spider(link, que, checked):
     for element in elements:
         check_element(element, que, checked)
     logging.getLogger()
-    print(link, threading.current_thread().name, threading.active_count(), len(checked.queue))
+    print(link, threading.current_thread().name, threading.active_count(), len(checked))
     logging.info(f"Проверяем {link}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
-    logging.info(f"\t\tCHECKED: {list(checked.queue)}")
+    logging.info(f"\t\tCHECKED: {list(checked)}, \tTHREAD: {threading.current_thread().name}")
+    que.task_done()
     driver.quit()
 
 
@@ -79,7 +80,7 @@ def check_element(element, que, checked):
     try:
         url = element.get_attribute('href')
         print(url, f"Thread name: {threading.current_thread().name}, active Threads: {threading.active_count()}")
-        if url is not None and url not in que.queue and url.startswith(SITE_NAME) and url not in checked.queue:
+        if url is not None and url not in que.queue and url.startswith(SITE_NAME) and url not in checked:
             que.put(url)
             logging.info(f"Такой url: {url} уже в списках. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     except StaleElementReferenceException as e:
@@ -121,13 +122,12 @@ def create_threads(que, checked):
         t = threading.Thread(target=run, args=(que, checked))
         t.daemon = True
         t.start()
-    # que.task_done()
 
 
 @timer
 def main():
     que = Queue()
-    checked = Queue()
+    checked = set()
     logging.basicConfig(filename="logs.log", level=logging.INFO)
     logging.info(f"\nНОВЫЙ ЗАПУСК. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
     try:
