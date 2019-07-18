@@ -1,4 +1,4 @@
-from multiprocessing import Queue, Process, Pool, Manager
+from multiprocessing import Queue, Process, Pool, Manager, current_process
 import time
 from datetime import datetime
 import argparse
@@ -28,16 +28,21 @@ def check_class(title:str):
 
 
 def run(que, checked):
+    print("run")
+    logging.getLogger()
     while True:
-        url = check_url(que)
-        logging.info(f"\t\tQUE: {list(que.queue)}")
+        print('TRUE', current_process().name)
+        url = que[0]
+        que = que[1:]
+        logging.info(f"\t\tQUE: {que}")
         if not url:
+            print('not url')
             logging.info(f"\t\tBREAKBREAKBREAKBREAKBREAK")
             break
         else:
-            checked.add(url)
+            print('spider, ', url)
+            checked.append(url)
             spider(url, que, checked)
-    que.task_done()
 
 
 def check_url(que):
@@ -51,6 +56,7 @@ def check_url(que):
 
 def spider(link, que, checked):
     global SITE_NAME
+    print("LINK", link)
     options = Options()
     options.add_argument('--headless')
     driver = webdriver.Chrome(os.path.abspath("./chromedriver"), chrome_options=options)
@@ -60,8 +66,7 @@ def spider(link, que, checked):
         check_element(element, que, checked)
     logging.getLogger()
     logging.info(f"Проверяем {link}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
-    logging.info(f"\t\tCHECKED: {list(checked)}")
-    que.task_done()
+    logging.info(f"\t\tCHECKED: {checked}")
     driver.quit()
 
 
@@ -69,8 +74,9 @@ def check_element(element, que, checked):
     logging.getLogger()
     try:
         url = element.get_attribute('href')
-        if url is not None and url not in que.queue and url.startswith(SITE_NAME) and url not in checked:
-            que.put(url)
+        print(url)
+        if url is not None and url not in que and url.startswith(SITE_NAME) and url not in checked:
+            que.append(url)
             logging.info(f"Такой url: {url} уже в списках. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     except StaleElementReferenceException as e:
         logging.info(e, f"Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
@@ -106,10 +112,17 @@ def create_class(title:str):
             f"Ошибка про создании класса. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 
 
+def create_proccess(func, *args):
+    for _ in range(4):
+        proc = Process(target=run, args=args)
+        proc.start()
+        proc.join()
+
+
 @timer
 def main():
-    que = Queue()
-    checked = set()
+    que = Manager().list()
+    checked = Manager().list()
     logging.basicConfig(filename="logs.log", level=logging.INFO)
     logging.info(f"\nНОВЫЙ ЗАПУСК. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
     try:
@@ -122,8 +135,8 @@ def main():
     global SITE_NAME
     try:
         SITE_NAME = args.site
-        que.put(SITE_NAME)
-        que.join()
+        que.append(SITE_NAME)
+        create_proccess(run, que, checked)
     except Exception as e:
         print(e)
 
