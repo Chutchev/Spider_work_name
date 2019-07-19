@@ -1,4 +1,6 @@
-from multiprocessing import Queue, Process, Pool, Manager, current_process
+from multiprocessing import Process, current_process
+from AdditionalClasses.my_queue import NewQueue
+from AdditionalClasses.my_manager import NewManager
 import time
 from datetime import datetime
 import argparse
@@ -32,17 +34,19 @@ def run(que, checked):
     logging.getLogger()
     while True:
         print('TRUE', current_process().name)
-        url = que[0]
-        que = que[1:]
-        logging.info(f"\t\tQUE: {que}")
-        if not url:
-            print('not url')
-            logging.info(f"\t\tBREAKBREAKBREAKBREAKBREAK")
+        try:
+            url = check_url(que)
+            logging.info(f"\t\tQUE: {que.get_attribute('queue')}")
+            if not url:
+                print('not url')
+                logging.info(f"\t\tBREAKBREAKBREAKBREAKBREAK")
+                break
+            else:
+                print('spider, ', url)
+                checked.append(url)
+                spider(url, que, checked)
+        except IndexError:
             break
-        else:
-            print('spider, ', url)
-            checked.append(url)
-            spider(url, que, checked)
 
 
 def check_url(que):
@@ -56,7 +60,7 @@ def check_url(que):
 
 def spider(link, que, checked):
     global SITE_NAME
-    print("LINK", link)
+    print("LINK -> ", link, " proccess -> ", current_process().name)
     options = Options()
     options.add_argument('--headless')
     driver = webdriver.Chrome(os.path.abspath("./chromedriver"), chrome_options=options)
@@ -68,15 +72,17 @@ def spider(link, que, checked):
     logging.info(f"Проверяем {link}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     logging.info(f"\t\tCHECKED: {checked}")
     driver.quit()
+    que.task_done()
 
 
 def check_element(element, que, checked):
     logging.getLogger()
     try:
         url = element.get_attribute('href')
-        print(url)
-        if url is not None and url not in que and url.startswith(SITE_NAME) and url not in checked:
-            que.append(url)
+        print(url, current_process().name)
+        if url is not None and url not in que.get_attribute('queue') and url.startswith(SITE_NAME) and url not in checked:
+            que.put(url)
+        else:
             logging.info(f"Такой url: {url} уже в списках. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     except StaleElementReferenceException as e:
         logging.info(e, f"Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
@@ -114,15 +120,18 @@ def create_class(title:str):
 
 def create_proccess(func, *args):
     for _ in range(4):
-        proc = Process(target=run, args=args)
+        proc = Process(target=func, args=args)
         proc.start()
-        proc.join()
+    proc.join()
 
 
 @timer
 def main():
-    que = Manager().list()
-    checked = Manager().list()
+    NewManager().register("Queue", NewQueue)
+    manager = NewManager()
+    manager.start()
+    que = manager.Queue()
+    checked = manager.list()
     logging.basicConfig(filename="logs.log", level=logging.INFO)
     logging.info(f"\nНОВЫЙ ЗАПУСК. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
     try:
@@ -135,8 +144,9 @@ def main():
     global SITE_NAME
     try:
         SITE_NAME = args.site
-        que.append(SITE_NAME)
+        que.put(SITE_NAME)
         create_proccess(run, que, checked)
+        que.join()
     except Exception as e:
         print(e)
 
