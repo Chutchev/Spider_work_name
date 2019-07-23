@@ -1,4 +1,5 @@
 import threading
+from threading import Lock
 from queue import Queue
 from queue import Empty
 import time
@@ -8,17 +9,11 @@ import logging
 import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import StaleElementReferenceException
+from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
 
 
 SITE_NAME = ""
-
-
-def thread(func):
-    def wrapper(*args):
-        if threading.active_count() < 4:
-            threading.Thread(target=func, args=args).start()
-    return wrapper
+lock = Lock()
 
 
 def timer(func):
@@ -49,6 +44,61 @@ def run(que, checked):
     que.task_done()
 
 
+def fill_xpath_dict(driver, els):
+    print('fill')
+    checked = set()
+    a = {'a': 'ссылку',
+         'h1': 'текст',
+         'input': 'кнопку',
+         'ul': 'список',
+         'li': 'пункт',
+         'span': 'блок',
+         'div': 'блок',
+         'label': 'текст label',
+         'button': 'кнопку button'
+         }
+    tags = {'a': ['href', 'text'],
+            'h1': ['text', 'id'],
+            'input': ['id', 'type'],
+            'ul': ['role', 'class'],
+            'li': ['class'],
+            'span': ['class'],
+            'div': ['class', 'id'],
+            'label': ['text', 'id'],
+            'button': ['id', 'class']
+            }
+    for tag, attributes in tags.items():
+        if a[tag] not in els.keys():
+            els[a[tag]] = []
+        elements = driver.find_elements_by_tag_name(tag)
+        for element in elements:
+            xpathes = {}
+            if element.text in checked:
+                continue
+            checked.add(element.text)
+            for attribute in attributes:
+                value = element.get_attribute(attribute)
+                xpathes[element.text] = ''
+                if attribute == 'text':
+                    xpathes[element.text] = (f"//{tag}[{attribute}()='{value}']")
+                else:
+                    xpathes[element.text] = (f"//{tag}[@{attribute}='{value}']")
+            try:
+                if driver.find_elements_by_xpath(xpathes[element.text]):
+                    els[a[tag]].append(xpathes)
+            except Exception:
+                print(xpathes, element.text)
+    return els, checked
+
+
+def check_elem(xpath, driver):
+    print(xpath)
+    try:
+        return driver.find_element_by_xpath(xpath)
+    except NoSuchElementException:
+        return False
+
+
 def check_url(que):
     try:
         res = que.get(timeout=20)
@@ -59,6 +109,7 @@ def check_url(que):
 
 
 def spider(link, que, checked):
+    global lock
     global SITE_NAME
     options = Options()
     options.add_argument('--headless')
@@ -67,7 +118,10 @@ def spider(link, que, checked):
     elements = driver.find_elements_by_xpath("//a")
     for element in elements:
         check_element(element, que, checked)
-    logging.getLogger()
+    els = {}
+    thread = threading.Thread(target=create_class, args=(driver, els))
+    thread.start()
+    thread.join()
     print(link, threading.current_thread().name, threading.active_count(), len(checked))
     logging.info(f"Проверяем {link}. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
     logging.info(f"\t\tCHECKED: {list(checked)}, \tTHREAD: {threading.current_thread().name}")
@@ -95,17 +149,20 @@ def create_py(pattern, title: str):
     logging.info(f"Класс {title.capitalize()} создан. Время: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 
 
-def create_class(title:str):
+def create_class(driver, xpath_dict):
+    title = driver.title
     pattern = """
     # {0}
+    
     class {1}:
 
-        xpath_dict = dict()
+        xpath_dict = {2}
 
         def __init__(self):
             pass"""
+    fill_xpath_dict(driver, xpath_dict)
     logging.getLogger()
-    pattern = pattern.format(datetime.now().strftime('%d-%m-%Y %H:%M:%S'), title)
+    pattern = pattern.format(datetime.now().strftime('%d-%m-%Y %H:%M:%S'), title, xpath_dict)
     try:
         if not check_class(title):
             create_py(pattern, title)
