@@ -33,7 +33,7 @@ def check_class(title:str):
 
 def run(que, checked):
     while True:
-        url = check_url(que)
+        url = que.get(timeout=20)
         logging.info(f"\t\tQUE: {list(que.queue)}, THREAD={threading.current_thread().name}")
         if not url:
             logging.info(f"\t\tBREAKBREAKBREAKBREAKBREAK")
@@ -54,8 +54,8 @@ def fill_xpath_dict(driver, els):
          'li': 'пункт',
          'span': 'блок',
          'div': 'блок',
-         'label': 'текст label',
-         'button': 'кнопку button'
+         'label': 'текст',
+         'button': 'кнопку'
          }
     tags = {'a': ['href', 'text'],
             'h1': ['text', 'id'],
@@ -97,15 +97,6 @@ def check_elem(xpath, driver):
         return driver.find_element_by_xpath(xpath)
     except NoSuchElementException:
         return False
-
-
-def check_url(que):
-    try:
-        res = que.get(timeout=20)
-    except Empty:
-        res = False
-    print(res, threading.current_thread().name)
-    return res
 
 
 def spider(link, que, checked):
